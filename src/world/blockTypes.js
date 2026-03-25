@@ -108,7 +108,7 @@ const BLOCK_DEFS = Object.freeze({
     creative: true,
     shape: "cube",
     uiColor: "#66b149",
-    textures: { top: "grass_top", bottom: "dirt", side: "grass_side" },
+    textures: { top: "grass_top", bottom: "grass_top", side: "grass_top" },
   },
   [BLOCK.DIRT]: {
     id: BLOCK.DIRT,

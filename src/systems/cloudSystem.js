@@ -20,6 +20,7 @@ export class CloudSystem {
     this.mesh = new THREE.InstancedMesh(this.geometry, this.material, CLOUD_COUNT);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 1;
     this.scene.add(this.mesh);
 
     this.dummy = new THREE.Object3D();
@@ -63,8 +64,8 @@ export class CloudSystem {
 
     this.mesh.instanceMatrix.needsUpdate = true;
 
-    const brightness = 0.32 + this.dayNightCycle.sunFactor * 0.75;
-    this.material.color.setRGB(brightness, brightness, brightness + 0.02);
-    this.material.opacity = 0.2 + this.dayNightCycle.sunFactor * 0.62;
+    const brightness = 0.82 + this.dayNightCycle.sunFactor * 0.18;
+    this.material.color.setRGB(brightness, brightness, brightness + 0.03);
+    this.material.opacity = 0.6 + this.dayNightCycle.sunFactor * 0.3;
   }
 }

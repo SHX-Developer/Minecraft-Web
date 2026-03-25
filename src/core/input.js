@@ -4,6 +4,7 @@ const CONTROL_CODES = new Set([
   "KeyS",
   "KeyD",
   "KeyE",
+  "KeyQ",
   "Space",
   "ShiftLeft",
   "ShiftRight",

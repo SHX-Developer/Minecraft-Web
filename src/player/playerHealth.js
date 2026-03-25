@@ -6,6 +6,8 @@ export class PlayerHealth {
     this.listeners = new Set();
     this.deathListeners = new Set();
     this.damageFlashTimer = 0;
+    this.timeSinceDamage = Infinity;
+    this.regenAccum = 0;
   }
 
   getHealth() {
@@ -22,6 +24,8 @@ export class PlayerHealth {
     }
     this.health = Math.max(0, this.health - amount);
     this.damageFlashTimer = 0.4;
+    this.timeSinceDamage = 0;
+    this.regenAccum = 0;
     this.emitChange();
     if (this.health <= 0) {
       this.isDead = true;
@@ -41,12 +45,24 @@ export class PlayerHealth {
     this.health = this.maxHealth;
     this.isDead = false;
     this.damageFlashTimer = 0;
+    this.timeSinceDamage = Infinity;
+    this.regenAccum = 0;
     this.emitChange();
   }
 
   update(delta) {
     if (this.damageFlashTimer > 0) {
       this.damageFlashTimer = Math.max(0, this.damageFlashTimer - delta);
+    }
+    if (!this.isDead && this.health < this.maxHealth) {
+      this.timeSinceDamage += delta;
+      if (this.timeSinceDamage >= 5.0) {
+        this.regenAccum += delta;
+        if (this.regenAccum >= 4.0) {
+          this.regenAccum -= 4.0;
+          this.heal(1);
+        }
+      }
     }
   }
 

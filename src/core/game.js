@@ -4,13 +4,19 @@ import { SfxManager } from "../audio/sfxManager.js";
 import { ParticlesManager } from "../effects/particlesManager.js";
 import { AnimalManager } from "../entities/animalManager.js";
 import { DroppedItemManager } from "../entities/droppedItemManager.js";
+import { EnemyManager } from "../entities/enemyManager.js";
+import { ZombieManager } from "../entities/zombieManager.js";
 import { PlayerController } from "../player/playerController.js";
 import { PlayerHealth } from "../player/playerHealth.js";
 import { raycastBlock } from "../player/raycast.js";
 import { BlockBreakSystem } from "../systems/blockBreakSystem.js";
 import { CloudSystem } from "../systems/cloudSystem.js";
+import { DaylightSystem } from "../systems/daylightSystem.js";
 import { DayNightCycle } from "../systems/dayNightCycle.js";
 import { FallDamageSystem } from "../systems/fallDamageSystem.js";
+import { ItemDropSystem } from "../systems/itemDropSystem.js";
+import { LightingSystem } from "../systems/lightingSystem.js";
+import { PlayerDrop } from "../systems/playerDrop.js";
 import { SprintFovSystem } from "../systems/sprintFovSystem.js";
 import { TorchLightSystem } from "../systems/torchLightSystem.js";
 import { WaterSystem } from "../systems/waterSystem.js";
@@ -19,6 +25,7 @@ import { HeartsUI } from "../ui/heartsUI.js";
 import { HeldItemRenderer } from "../ui/heldItemRenderer.js";
 import { InventoryUI } from "../ui/inventoryUI.js";
 import {
+  ACTION_REPEAT_INTERVAL,
   MAX_DELTA_TIME,
   MAX_RAY_DISTANCE,
   SFX_BREAK_VOLUME,
@@ -105,6 +112,8 @@ export class Game {
     this.selectionMesh = null;
     this.currentTarget = null;
     this.dayNightCycle = null;
+    this.daylightSystem = null;
+    this.lightingSystem = null;
     this.waterSystem = null;
     this.cloudSystem = null;
     this.sprintFovSystem = null;
@@ -114,7 +123,11 @@ export class Game {
     this.sfxManager = null;
     this.particlesManager = null;
     this.animalManager = null;
+    this.zombieManager = null;
+    this.enemyManager = null;
     this.droppedItemManager = null;
+    this.itemDropSystem = null;
+    this.playerDropSystem = null;
     this.blockBreakSystem = null;
     this.fallDamageSystem = null;
     this.heartsUI = null;
@@ -135,6 +148,8 @@ export class Game {
     this.onInventoryKeyDown = null;
 
     this.atlasTexture = null;
+    this.breakRepeatTimer = 0;
+    this.placeRepeatTimer = 0;
   }
 
   async init() {
@@ -166,10 +181,43 @@ export class Game {
     });
 
     this.dayNightCycle = new DayNightCycle(this.scene);
+    this.daylightSystem = new DaylightSystem(this.dayNightCycle);
+    this.lightingSystem = new LightingSystem(this.renderer, this.dayNightCycle);
     this.cloudSystem = new CloudSystem(this.scene, this.dayNightCycle);
     this.sprintFovSystem = new SprintFovSystem(this.camera);
     this.particlesManager = new ParticlesManager(this.scene);
     this.animalManager = new AnimalManager(this.scene, this.world, this.particlesManager);
+    const onMobAttackPlayer = (damage, sourcePosition) => {
+      if (!this.gameModeManager.isSurvival() || this.dead) {
+        return;
+      }
+      this.playerHealth.takeDamage(damage);
+      this.playerController.startCameraShake(0.09, 0.35);
+      if (sourcePosition) {
+        this.playerController.applyKnockback(
+          sourcePosition.x,
+          sourcePosition.y,
+          sourcePosition.z,
+          4.0
+        );
+      }
+    };
+
+    this.zombieManager = new ZombieManager(
+      this.scene,
+      this.world,
+      this.particlesManager,
+      this.daylightSystem,
+      onMobAttackPlayer
+    );
+
+    this.enemyManager = new EnemyManager(
+      this.scene,
+      this.world,
+      this.particlesManager,
+      this.daylightSystem,
+      onMobAttackPlayer
+    );
     this.torchLightSystem = new TorchLightSystem(this.scene, this.world);
     this.heldItemRenderer = new HeldItemRenderer(this.heldItemCanvas, this.atlasTexture);
     this.musicManager = new MusicManager({
@@ -183,6 +231,19 @@ export class Game {
     });
 
     this.droppedItemManager = new DroppedItemManager(this.scene, this.world, this.atlasTexture);
+    this.itemDropSystem = new ItemDropSystem(this.droppedItemManager, (blockId) => {
+      if (!this.gameModeManager.isSurvival()) {
+        return true;
+      }
+      return this.inventoryUI.model.addItemToInventory(blockId);
+    });
+    this.playerDropSystem = new PlayerDrop({
+      input: this.input,
+      inventoryUI: this.inventoryUI,
+      playerController: this.playerController,
+      gameModeManager: this.gameModeManager,
+      itemDropSystem: this.itemDropSystem,
+    });
     this.blockBreakSystem = new BlockBreakSystem(this.scene);
     this.fallDamageSystem = new FallDamageSystem(this.playerController, this.playerHealth, this.gameModeManager);
 
@@ -296,6 +357,8 @@ export class Game {
     const playerPosition = this.playerController.getPosition();
     this.world.update(playerPosition);
     this.dayNightCycle.update(delta, playerPosition);
+    this.daylightSystem.update();
+    this.lightingSystem.update(playerPosition);
     this.cloudSystem.update(delta, playerPosition);
     this.waterSystem.update(delta);
     this.sprintFovSystem.update(
@@ -304,16 +367,13 @@ export class Game {
     );
     this.torchLightSystem.update(delta, playerPosition);
     this.animalManager.update(delta, playerPosition);
+    this.zombieManager.update(delta, playerPosition);
+    this.enemyManager.update(delta, playerPosition);
+    this.itemDropSystem.update(delta, playerPosition);
     this.particlesManager.update(delta);
 
     this.playerHealth.update(delta);
     this.fallDamageSystem.update();
-
-    if (this.gameModeManager.isSurvival()) {
-      this.droppedItemManager.update(delta, playerPosition, (blockId) => {
-        return this.inventoryUI.model.addItemToInventory(blockId);
-      });
-    }
 
     if (this.damageOverlay) {
       this.damageOverlay.style.opacity = this.playerHealth.isDamageFlashing() ? "0.35" : "0";
@@ -324,6 +384,7 @@ export class Game {
       delta,
       this.playerController.player.isSprinting && controlsEnabled
     );
+    this.playerDropSystem.update(controlsEnabled);
 
     if (controlsEnabled) {
       this.updateBlockTarget();
@@ -398,34 +459,95 @@ export class Game {
   }
 
   handleBlockActions(delta) {
-    if (this.input.isMouseDown(0)) {
-      this.handleBreakAction(delta);
+    this.breakRepeatTimer = Math.max(0, this.breakRepeatTimer - delta);
+    this.placeRepeatTimer = Math.max(0, this.placeRepeatTimer - delta);
+
+    const mouseJustPressed = this.input.consumeMouseButton(0);
+    const mouseHeld = this.input.isMouseDown(0);
+
+    if (mouseHeld || mouseJustPressed) {
+      // Throttle instant-break in creative so it doesn't spam every frame
+      if (mouseJustPressed || this.breakRepeatTimer <= 0) {
+        this.handleBreakAction(delta, mouseJustPressed);
+      }
     } else {
       this.blockBreakSystem.cancelBreaking();
+      this.heldItemRenderer.setBreaking(false);
+      this.breakRepeatTimer = 0;
     }
 
-    if (this.input.consumeMouseButton(2)) {
+    const rmbJustPressed = this.input.consumeMouseButton(2);
+    const rmbHeld = this.input.isMouseDown(2);
+    if (rmbJustPressed || (rmbHeld && this.placeRepeatTimer <= 0)) {
       this.performPlaceAction();
+      this.heldItemRenderer.startSwing();
+      this.placeRepeatTimer = ACTION_REPEAT_INTERVAL;
+    }
+    if (!rmbHeld) {
+      this.placeRepeatTimer = 0;
     }
   }
 
-  handleBreakAction(delta) {
+  handleBreakAction(delta, isFirstPress) {
     const blockDistance = this.currentTarget ? this.currentTarget.distance : MAX_RAY_DISTANCE;
-    const hitAnimal = this.animalManager.tryHitFromRay(
-      this.tmpRayOrigin,
-      this.tmpRayDirection,
-      MAX_RAY_DISTANCE,
-      1,
-      blockDistance
-    );
-    if (hitAnimal) {
-      this.sfxManager.playBlockBreak();
-      this.blockBreakSystem.cancelBreaking();
-      return;
+
+    // Mob attacks — only on first press (one click = one hit)
+    if (isFirstPress) {
+      const hitZombie = this.zombieManager.tryHitFromRay(
+        this.tmpRayOrigin,
+        this.tmpRayDirection,
+        MAX_RAY_DISTANCE,
+        1,
+        blockDistance
+      );
+      if (hitZombie) {
+        this.sfxManager.playBlockBreak();
+        this.blockBreakSystem.cancelBreaking();
+        this.heldItemRenderer.setBreaking(false);
+        this.heldItemRenderer.startSwing();
+        return;
+      }
+
+      const hitAnimal = this.animalManager.tryHitFromRay(
+        this.tmpRayOrigin,
+        this.tmpRayDirection,
+        MAX_RAY_DISTANCE,
+        1,
+        blockDistance
+      );
+      if (hitAnimal) {
+        this.sfxManager.playBlockBreak();
+        this.blockBreakSystem.cancelBreaking();
+        this.heldItemRenderer.setBreaking(false);
+        this.heldItemRenderer.startSwing();
+        return;
+      }
+
+      const hitEnemy = this.enemyManager.tryHitFromRay(
+        this.tmpRayOrigin,
+        this.tmpRayDirection,
+        MAX_RAY_DISTANCE,
+        1,
+        blockDistance
+      );
+      if (hitEnemy) {
+        this.sfxManager.playBlockBreak();
+        this.blockBreakSystem.cancelBreaking();
+        this.heldItemRenderer.setBreaking(false);
+        this.heldItemRenderer.startSwing();
+        return;
+      }
+
+      // Swing in air when no target
+      if (!this.currentTarget) {
+        this.heldItemRenderer.startSwing();
+        return;
+      }
     }
 
     if (!this.currentTarget) {
       this.blockBreakSystem.cancelBreaking();
+      this.heldItemRenderer.setBreaking(false);
       return;
     }
 
@@ -433,22 +555,42 @@ export class Game {
     const targetId = this.world.getBlock(target.x, target.y, target.z);
     if (!isBlockBreakable(targetId)) {
       this.blockBreakSystem.cancelBreaking();
+      this.heldItemRenderer.setBreaking(false);
       return;
     }
 
     const instantBreak = this.gameModeManager.instantBreak();
 
     if (!this.blockBreakSystem.isSameTarget(target.x, target.y, target.z)) {
-      const readyNow = this.blockBreakSystem.startBreaking(target.x, target.y, target.z, targetId, instantBreak);
+      const readyNow = this.blockBreakSystem.startBreaking(
+        target.x,
+        target.y,
+        target.z,
+        targetId,
+        instantBreak
+      );
       if (readyNow) {
+        this.heldItemRenderer.startSwing();
+        this.heldItemRenderer.setBreaking(false);
         this.breakBlock(target.x, target.y, target.z, targetId);
+        if (instantBreak) {
+          this.breakRepeatTimer = ACTION_REPEAT_INTERVAL;
+        }
+      } else {
+        this.heldItemRenderer.setBreaking(true);
       }
       return;
     }
 
+    this.heldItemRenderer.setBreaking(true);
     const broken = this.blockBreakSystem.continueBreaking(delta);
     if (broken) {
+      this.heldItemRenderer.startSwing();
+      this.heldItemRenderer.setBreaking(false);
       this.breakBlock(target.x, target.y, target.z, targetId);
+      if (instantBreak) {
+        this.breakRepeatTimer = ACTION_REPEAT_INTERVAL;
+      }
     }
   }
 
@@ -464,7 +606,12 @@ export class Game {
     this.sfxManager.playBlockBreak();
 
     if (this.gameModeManager.hasItemDrop()) {
-      this.droppedItemManager.spawnItem(blockId, x, y, z);
+      const dropId = blockId === BLOCK.GRASS ? BLOCK.DIRT
+        : blockId === BLOCK.LEAVES ? null
+        : blockId;
+      if (dropId !== null) {
+        this.itemDropSystem.dropFromBlock(dropId, x, y, z);
+      }
     }
   }
 
@@ -523,8 +670,9 @@ export class Game {
     }
 
     if (this.gameModeManager.isSurvival()) {
+      this.dropInventoryOnDeath();
       this.inventoryUI.model.clearAll();
-      this.droppedItemManager.clear();
+      this.itemDropSystem.clear();
     }
 
     await this.deathScreen.show();
@@ -540,6 +688,30 @@ export class Game {
     this.playerController.player.isCrouching = false;
 
     this.dead = false;
+    this.input.requestPointerLock();
+  }
+
+  dropInventoryOnDeath() {
+    const playerPos = this.playerController.getPosition();
+    const dropBase = {
+      x: playerPos.x,
+      y: playerPos.y + 0.5,
+      z: playerPos.z,
+    };
+
+    const dropSlots = (kind, count) => {
+      for (let i = 0; i < count; i += 1) {
+        const blockId = this.inventoryUI.model.getSlot(kind, i);
+        const stackCount = this.inventoryUI.model.getSlotCount(kind, i);
+        if (blockId == null || stackCount <= 0) {
+          continue;
+        }
+        this.itemDropSystem.dropForDeath(blockId, dropBase);
+      }
+    };
+
+    dropSlots("hotbar", 9);
+    dropSlots("storage", 27);
   }
 
   cleanupUnsupportedTorchesAround(worldX, worldY, worldZ) {
@@ -633,6 +805,8 @@ export class Game {
       `Load queue: ${queues.loadQueue} | Rebuild queue: ${queues.rebuildQueue}`,
       `Block: ${this.inventoryUI.getSelectedBlockName()}`,
       `Animals: ${this.animalManager.getCount()}`,
+      `Zombies: ${this.zombieManager.getCount()}`,
+      `Enemies: ${this.enemyManager.getCount()}`,
       `State: ${this.playerController.getMovementMode()}`,
     ];
 
@@ -642,7 +816,7 @@ export class Game {
     }
 
     lines.push(
-      `Day/Night cycle: ${((this.dayNightCycle.time / this.dayNightCycle.cycleDuration) * 100).toFixed(0)}%`
+      `Day/Night cycle: ${((this.dayNightCycle.time / this.dayNightCycle.cycleDuration) * 100).toFixed(0)}% (${this.daylightSystem.isDaylight() ? "day" : "night"})`
     );
 
     this.debugRoot.textContent = lines.join("\n");
@@ -673,6 +847,12 @@ export class Game {
     if (this.animalManager) {
       this.animalManager.destroy();
     }
+    if (this.zombieManager) {
+      this.zombieManager.destroy();
+    }
+    if (this.enemyManager) {
+      this.enemyManager.destroy();
+    }
     if (this.inventoryUI) {
       this.inventoryUI.destroy();
     }
@@ -682,7 +862,9 @@ export class Game {
     if (this.torchLightSystem) {
       this.torchLightSystem.destroy();
     }
-    if (this.droppedItemManager) {
+    if (this.itemDropSystem) {
+      this.itemDropSystem.destroy();
+    } else if (this.droppedItemManager) {
       this.droppedItemManager.destroy();
     }
     if (this.blockBreakSystem) {

@@ -36,8 +36,26 @@ export class InventoryUI {
     this.mouseY = 0;
     this.isCreativePanelOpen = false;
     this.survivalMode = false;
+    this.creativeModalOverlay = document.getElementById("creative-modal-overlay");
 
     this.unsubscribeModel = this.model.onChange(() => this.refresh());
+    this.onCreativeModalClose = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.setCreativePanelOpen(false);
+    };
+    this.onCreativeModalBackdrop = (event) => {
+      if (event.target === this.creativeModalOverlay) {
+        this.setCreativePanelOpen(false);
+      }
+    };
+    const closeBtn = document.getElementById("creative-modal-close");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", this.onCreativeModalClose);
+    }
+    if (this.creativeModalOverlay) {
+      this.creativeModalOverlay.addEventListener("pointerdown", this.onCreativeModalBackdrop);
+    }
     this.onMouseMove = (event) => {
       this.mouseX = event.clientX;
       this.mouseY = event.clientY;
@@ -69,6 +87,18 @@ export class InventoryUI {
     const creativeSection = document.getElementById("inventory-creative");
     if (creativeSection) {
       creativeSection.style.display = survival ? "none" : "";
+    }
+
+    if (this.trashElement) {
+      this.trashElement.style.display = survival ? "none" : "";
+    }
+
+    const header = document.getElementById("inventory-header");
+    if (header) {
+      const title = header.querySelector("span");
+      if (title) {
+        title.textContent = survival ? "Inventory" : "Creative Inventory";
+      }
     }
 
     this.build();
@@ -122,8 +152,9 @@ export class InventoryUI {
 
   setCreativePanelOpen(open) {
     this.isCreativePanelOpen = Boolean(open);
-    if (this.creativePanelElement) {
-      this.creativePanelElement.classList.toggle("open", this.isCreativePanelOpen);
+    if (this.creativeModalOverlay) {
+      this.creativeModalOverlay.classList.toggle("visible", this.isCreativePanelOpen);
+      this.creativeModalOverlay.setAttribute("aria-hidden", this.isCreativePanelOpen ? "false" : "true");
     }
     if (this.creativeToggleElement) {
       this.creativeToggleElement.classList.toggle("active", this.isCreativePanelOpen);
@@ -280,6 +311,7 @@ export class InventoryUI {
     if (!this.isOpenState) {
       return;
     }
+    this.setCreativePanelOpen(false);
     this.isOpenState = false;
     this.overlayElement.classList.remove("visible");
     this.overlayElement.setAttribute("aria-hidden", "true");
@@ -340,6 +372,13 @@ export class InventoryUI {
     }
     if (this.creativeToggleElement) {
       this.creativeToggleElement.removeEventListener("click", this.onCreativeToggleClick);
+    }
+    const closeBtn = document.getElementById("creative-modal-close");
+    if (closeBtn) {
+      closeBtn.removeEventListener("click", this.onCreativeModalClose);
+    }
+    if (this.creativeModalOverlay) {
+      this.creativeModalOverlay.removeEventListener("pointerdown", this.onCreativeModalBackdrop);
     }
     this.previewCache.destroy();
   }

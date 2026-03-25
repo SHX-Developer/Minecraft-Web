@@ -1,7 +1,7 @@
 export const ANIMAL_TYPES = [
   {
     id: "chicken",
-    body: [0.56, 0.58, 0.62],
+    body: [0.56, 0.58, 0.82],
     head: [0.42, 0.42, 0.42],
     leg: [0.1, 0.34, 0.1],
     bodyColor: "#f2f2f2",
@@ -16,7 +16,7 @@ export const ANIMAL_TYPES = [
   },
   {
     id: "pig",
-    body: [1.06, 0.7, 1.02],
+    body: [1.06, 0.7, 1.32],
     head: [0.46, 0.44, 0.44],
     leg: [0.14, 0.34, 0.14],
     bodyColor: "#e6a6b4",
@@ -29,7 +29,7 @@ export const ANIMAL_TYPES = [
   },
   {
     id: "cow",
-    body: [1.2, 0.84, 1.14],
+    body: [1.2, 0.84, 1.52],
     head: [0.5, 0.5, 0.46],
     leg: [0.16, 0.44, 0.16],
     bodyColor: "#755541",
@@ -43,7 +43,7 @@ export const ANIMAL_TYPES = [
   },
   {
     id: "sheep",
-    body: [1.14, 0.84, 1.12],
+    body: [1.14, 0.84, 1.44],
     head: [0.42, 0.42, 0.42],
     leg: [0.14, 0.38, 0.14],
     bodyColor: "#ececec",

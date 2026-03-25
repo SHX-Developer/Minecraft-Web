@@ -21,8 +21,8 @@ export class DayNightCycle {
   constructor(scene) {
     this.scene = scene;
     this.cycleDuration = DAY_DURATION_SECONDS + NIGHT_DURATION_SECONDS;
-    this.time = this.cycleDuration * 0.5;
-    this.orbitRadius = 320;
+    this.time = this.cycleDuration * 0.28;
+    this.orbitRadius = 180;
     this.skyElevation = 88;
     this.worldAzimuth = 0.42;
 
@@ -37,31 +37,28 @@ export class DayNightCycle {
     this.sunLight.target = this.lightTarget;
     this.moonLight.target = this.lightTarget;
 
-    const squareGeometry = new THREE.PlaneGeometry(18, 18);
-    this.sunMesh = new THREE.Mesh(
-      squareGeometry,
-      new THREE.MeshBasicMaterial({
-        color: 0xffc66f,
-        transparent: true,
-        opacity: 1,
-        depthTest: true,
-        depthWrite: false,
-        fog: false,
-        side: THREE.DoubleSide,
-      })
-    );
-    this.moonMesh = new THREE.Mesh(
-      squareGeometry.clone(),
-      new THREE.MeshBasicMaterial({
-        color: 0xd6e6ff,
-        transparent: true,
-        opacity: 1,
-        depthTest: true,
-        depthWrite: false,
-        fog: false,
-        side: THREE.DoubleSide,
-      })
-    );
+    const sunMat = new THREE.SpriteMaterial({
+      color: 0xffc66f,
+      fog: false,
+      depthTest: true,
+      depthWrite: false,
+    });
+    this.sunMesh = new THREE.Sprite(sunMat);
+    this.sunMesh.scale.set(42, 42, 1);
+    this.sunMesh.frustumCulled = false;
+    this.sunMesh.renderOrder = 0;
+
+    const moonMat = new THREE.SpriteMaterial({
+      color: 0xd6e6ff,
+      fog: false,
+      depthTest: true,
+      depthWrite: false,
+    });
+    this.moonMesh = new THREE.Sprite(moonMat);
+    this.moonMesh.scale.set(36, 36, 1);
+    this.moonMesh.frustumCulled = false;
+    this.moonMesh.renderOrder = 0;
+
     this.skyAnchor.add(this.sunMesh, this.moonMesh);
 
     this.starField = this.createStarField();
@@ -81,6 +78,7 @@ export class DayNightCycle {
       this.worldAzimuth
     );
     this.centerAtEye = new THREE.Vector3();
+    this.sunLookTarget = new THREE.Vector3();
     this.lightTargetPos = new THREE.Vector3();
   }
 
@@ -107,10 +105,14 @@ export class DayNightCycle {
       transparent: true,
       opacity: 0,
       sizeAttenuation: true,
+      depthTest: true,
       depthWrite: false,
       fog: false,
     });
-    return new THREE.Points(geometry, material);
+    const points = new THREE.Points(geometry, material);
+    points.frustumCulled = false;
+    points.renderOrder = -2;
+    return points;
   }
 
   update(delta, playerPosition) {
@@ -127,10 +129,6 @@ export class DayNightCycle {
 
     this.sunMesh.position.copy(this.sunDir).multiplyScalar(this.orbitRadius);
     this.moonMesh.position.copy(this.moonDir).multiplyScalar(this.orbitRadius);
-
-    this.centerAtEye.set(0, 0, 0);
-    this.sunMesh.lookAt(this.centerAtEye);
-    this.moonMesh.lookAt(this.centerAtEye);
 
     const sunWorldPos = this.sunMesh.getWorldPosition(this.lightTargetPos);
     this.sunLight.position.copy(sunWorldPos);

@@ -94,6 +94,8 @@ export class AnimalManager {
       const geometry = new THREE.BoxGeometry(size[0], size[1], size[2]);
       const material = new THREE.MeshLambertMaterial({ color });
       const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
       mesh.userData.baseColor = new THREE.Color(color);
       parts.push(mesh);
       return mesh;
@@ -142,6 +144,9 @@ export class AnimalManager {
       hitFlash: 0,
       speedScale: 1,
       hitKnockback: new THREE.Vector2(0, 0),
+      fleeTimer: 0,
+      velocityY: 0,
+      isGrounded: true,
       collisionRadius: Math.max(def.body[0], def.body[2]) * 0.38,
       collisionHeight: def.leg[1] + def.body[1] + 0.32,
     };
@@ -201,6 +206,13 @@ export class AnimalManager {
   }
 
   updateAnimal(animal, delta) {
+    // Flee after being hit
+    if (animal.fleeTimer > 0) {
+      animal.fleeTimer -= delta;
+      // Flee away from the direction they were hit
+      animal.wanderTimer = 0.5;
+    }
+
     animal.wanderTimer -= delta;
     if (animal.wanderTimer <= 0) {
       animal.wanderTimer = 1.1 + Math.random() * 3.2;
@@ -224,7 +236,8 @@ export class AnimalManager {
     animal.yaw = animal.mesh.rotation.y;
 
     const turnPenalty = Math.max(0.18, 1 - Math.min(1, Math.abs(yawStep) / 1.2));
-    const baseSpeed = animal.def.speed * (animal.hitFlash > 0 ? 0.65 : 1) * turnPenalty;
+    const fleeSpeedMult = animal.fleeTimer > 0 ? 2.5 : 1;
+    const baseSpeed = animal.def.speed * (animal.hitFlash > 0 ? 0.8 : 1) * turnPenalty * fleeSpeedMult;
     // Animal models are authored facing +Z, so forward movement must match that local forward.
     let moveX = Math.sin(animal.mesh.rotation.y) * baseSpeed * delta + animal.hitKnockback.x * delta;
     let moveZ = Math.cos(animal.mesh.rotation.y) * baseSpeed * delta + animal.hitKnockback.y * delta;
@@ -244,7 +257,18 @@ export class AnimalManager {
     animal.mesh.position.z += moveZ;
 
     const groundY = this.world.getSurfaceHeight(animal.mesh.position.x, animal.mesh.position.z);
-    animal.mesh.position.y += ((groundY + 1) - animal.mesh.position.y) * Math.min(1, delta * 12);
+    const targetY = groundY + 1;
+    if (!animal.isGrounded) {
+      animal.velocityY -= 24.0 * delta;
+      animal.mesh.position.y += animal.velocityY * delta;
+      if (animal.mesh.position.y <= targetY) {
+        animal.mesh.position.y = targetY;
+        animal.velocityY = 0;
+        animal.isGrounded = true;
+      }
+    } else {
+      animal.mesh.position.y += (targetY - animal.mesh.position.y) * Math.min(1, delta * 12);
+    }
   }
 
   canMoveTo(animal, nextX, nextZ) {
@@ -338,7 +362,13 @@ export class AnimalManager {
 
     nearestAnimal.hp -= damage;
     nearestAnimal.hitFlash = HIT_FLASH_DURATION;
-    nearestAnimal.hitKnockback.set(direction.x * 2.2, direction.z * 2.2);
+    nearestAnimal.hitKnockback.set(direction.x * 3.5, direction.z * 3.5);
+    // Hop + flee on hit
+    nearestAnimal.velocityY = Math.max(nearestAnimal.velocityY || 0, 5.0);
+    nearestAnimal.isGrounded = false;
+    nearestAnimal.fleeTimer = 3.0;
+    nearestAnimal.targetYaw = Math.atan2(-direction.x, -direction.z);
+    nearestAnimal.wanderTimer = 3.0;
     return true;
   }
 

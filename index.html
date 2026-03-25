@@ -55,25 +55,29 @@
               </div>
             </div>
             <div id="inventory-creative">
-              <div id="inventory-creative-header">
+              <div id="inventory-creative-actions">
                 <div class="inventory-section-title">Creative Blocks</div>
+                <button id="inventory-trash-slot" type="button" title="Drop item here to delete">🗑</button>
                 <button id="inventory-creative-toggle" type="button">Все блоки</button>
-              </div>
-              <div id="inventory-creative-panel">
-                <div id="inventory-creative-grid"></div>
               </div>
             </div>
           </div>
           <div class="inventory-section-title">Storage</div>
           <div id="inventory-storage-grid"></div>
-          <div id="inventory-bottom-row">
-            <div id="inventory-hotbar-wrap">
-              <div class="inventory-section-title">Hotbar</div>
-              <div id="inventory-hotbar-grid"></div>
-            </div>
-            <button id="inventory-trash-slot" type="button" title="Drop item here to delete">
-              🗑
-            </button>
+          <div id="inventory-hotbar-wrap">
+            <div class="inventory-section-title">Hotbar</div>
+            <div id="inventory-hotbar-grid"></div>
+          </div>
+        </div>
+      </div>
+      <div id="creative-modal-overlay" aria-hidden="true">
+        <div id="creative-modal-panel">
+          <div id="creative-modal-header">
+            <span>All Blocks</span>
+            <button id="creative-modal-close" type="button">✕</button>
+          </div>
+          <div id="inventory-creative-panel">
+            <div id="inventory-creative-grid"></div>
           </div>
         </div>
       </div>

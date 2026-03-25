@@ -35,10 +35,10 @@ export class HeldItemRenderer {
 
     const armMaterial = new THREE.MeshLambertMaterial({ color: 0xd8b89b });
     const sleeveMaterial = new THREE.MeshLambertMaterial({ color: 0x4a6387 });
-    const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.44, 1.08, 0.44), sleeveMaterial);
-    sleeve.position.set(0, -0.52, 0);
-    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.82, 0.38), armMaterial);
-    hand.position.set(0, 0.3, 0);
+    const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.78, 1.36, 0.78), sleeveMaterial);
+    sleeve.position.set(0, -0.62, 0);
+    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.68, 1.0, 0.68), armMaterial);
+    hand.position.set(0, 0.36, 0);
     this.handGroup.add(sleeve, hand);
     this.scene.add(this.handGroup);
 
@@ -49,6 +49,13 @@ export class HeldItemRenderer {
     this.currentMeshBaseScale = 1;
     this.time = 0;
     this.visible = true;
+
+    // Swing animation state
+    this.isSwinging = false;
+    this.swingTimer = 0;
+    this.swingDuration = 0.22;
+    this.isBreakingAnim = false;
+    this.breakPhase = 0;
   }
 
   setItem(blockId) {
@@ -93,11 +100,44 @@ export class HeldItemRenderer {
     this.canvas.style.opacity = visible ? "1" : "0";
   }
 
+  startSwing() {
+    this.isSwinging = true;
+    this.swingTimer = 0;
+    this.isBreakingAnim = false;
+    this.breakPhase = 0;
+  }
+
+  setBreaking(isBreaking) {
+    if (isBreaking && !this.isBreakingAnim) {
+      this.isBreakingAnim = true;
+      this.breakPhase = 0;
+      this.isSwinging = false;
+    } else if (!isBreaking) {
+      this.isBreakingAnim = false;
+    }
+  }
+
   update(delta, isSprinting = false) {
     if (!this.visible) {
       return;
     }
     this.time += delta;
+
+    // Compute swing offset for X rotation
+    let swingOffsetX = 0;
+    if (this.isBreakingAnim) {
+      this.breakPhase += delta * 9.5;
+      swingOffsetX = -Math.abs(Math.sin(this.breakPhase)) * 0.9;
+    } else if (this.isSwinging) {
+      this.swingTimer += delta;
+      const t = this.swingTimer / this.swingDuration;
+      if (t >= 1) {
+        this.isSwinging = false;
+        this.swingTimer = 0;
+      } else {
+        swingOffsetX = -Math.sin(t * Math.PI) * 1.3;
+      }
+    }
 
     const bob = Math.sin(this.time * 5.8) * (isSprinting ? 0.05 : 0.022);
     this.handGroup.position.set(
@@ -106,7 +146,7 @@ export class HeldItemRenderer {
       this.baseHandPosition.z
     );
     this.handGroup.rotation.set(
-      this.baseHandRotation.x + Math.cos(this.time * 3.2) * (isSprinting ? 0.045 : 0.015),
+      this.baseHandRotation.x + swingOffsetX + Math.cos(this.time * 3.2) * (isSprinting ? 0.045 : 0.015),
       this.baseHandRotation.y + Math.sin(this.time * 2.4) * 0.02,
       this.baseHandRotation.z + Math.sin(this.time * 2.2) * (isSprinting ? 0.035 : 0.012)
     );

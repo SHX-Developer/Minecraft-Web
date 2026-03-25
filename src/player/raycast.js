@@ -34,7 +34,7 @@ export function raycastBlock(world, origin, direction, maxDistance) {
 
   while (traveled <= maxDistance) {
     const id = world.getBlock(x, y, z);
-    if (id !== BLOCK.AIR) {
+    if (id !== BLOCK.AIR && id !== BLOCK.WATER) {
       return {
         id,
         distance: traveled,

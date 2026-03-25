@@ -37,8 +37,8 @@ export class World {
     this.transparentMaterial = new THREE.MeshLambertMaterial({
       map: atlasTexture,
       transparent: true,
-      opacity: 0.62,
-      depthWrite: true,
+      opacity: 0.42,
+      depthWrite: false,
       depthTest: true,
       side: THREE.FrontSide,
     });
@@ -272,6 +272,8 @@ export class World {
       const opaqueMesh = new THREE.Mesh(meshes.opaqueGeometry, this.opaqueMaterial);
       opaqueMesh.frustumCulled = true;
       opaqueMesh.renderOrder = 0;
+      opaqueMesh.castShadow = true;
+      opaqueMesh.receiveShadow = true;
       entry.group.add(opaqueMesh);
       entry.opaqueMesh = opaqueMesh;
     }
@@ -280,6 +282,8 @@ export class World {
       const transparentMesh = new THREE.Mesh(meshes.transparentGeometry, this.transparentMaterial);
       transparentMesh.frustumCulled = true;
       transparentMesh.renderOrder = 1;
+      transparentMesh.castShadow = false;
+      transparentMesh.receiveShadow = true;
       entry.group.add(transparentMesh);
       entry.transparentMesh = transparentMesh;
     }
@@ -288,6 +292,8 @@ export class World {
       const emissiveMesh = new THREE.Mesh(meshes.emissiveGeometry, this.emissiveMaterial);
       emissiveMesh.frustumCulled = true;
       emissiveMesh.renderOrder = 2;
+      emissiveMesh.castShadow = false;
+      emissiveMesh.receiveShadow = false;
       entry.group.add(emissiveMesh);
       entry.emissiveMesh = emissiveMesh;
     }
@@ -323,7 +329,7 @@ export class World {
     const worldX = 8;
     const worldZ = 8;
     const groundY = this.generator.getSurfaceHeight(worldX, worldZ);
-    const spawnY = Math.max(groundY + 4, WATER_LEVEL + 4);
+    const spawnY = Math.max(groundY + 1, WATER_LEVEL + 2);
     return new THREE.Vector3(worldX + 0.5, spawnY, worldZ + 0.5);
   }
 

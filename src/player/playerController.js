@@ -47,6 +47,11 @@ export class PlayerController {
     this.lastSpaceTapTime = -Infinity;
     this.movementMode = "walk";
     this.gameModeManager = null;
+
+    this.shakeTimer = Infinity;
+    this.shakeDuration = 0.3;
+    this.shakeIntensity = 0;
+    this.jumpCooldown = 0;
   }
 
   setGameModeManager(gameModeManager) {
@@ -74,7 +79,37 @@ export class PlayerController {
     this.updateLook(allowInput);
     this.updateMovement(delta, allowInput);
     this.updateEyeHeight(delta);
+    this.updateCameraShake(delta);
     this.body.position.copy(this.player.position);
+  }
+
+  startCameraShake(intensity, duration) {
+    this.shakeIntensity = intensity;
+    this.shakeDuration = duration;
+    this.shakeTimer = 0;
+  }
+
+  applyKnockback(sourceX, sourceY, sourceZ, strength) {
+    const dx = this.player.position.x - sourceX;
+    const dz = this.player.position.z - sourceZ;
+    const len = Math.max(0.001, Math.hypot(dx, dz));
+    this.player.velocity.x += (dx / len) * strength;
+    this.player.velocity.z += (dz / len) * strength;
+    this.player.velocity.y = Math.max(this.player.velocity.y, 4.5);
+  }
+
+  updateCameraShake(delta) {
+    if (this.shakeTimer >= this.shakeDuration) {
+      if (this.camera.position.x !== 0 || this.camera.position.y !== 0) {
+        this.camera.position.set(0, 0, 0);
+      }
+      return;
+    }
+    this.shakeTimer += delta;
+    const t = 1 - Math.min(1, this.shakeTimer / this.shakeDuration);
+    const sx = (Math.random() - 0.5) * this.shakeIntensity * t;
+    const sy = (Math.random() - 0.5) * this.shakeIntensity * t;
+    this.camera.position.set(sx, sy, 0);
   }
 
   updateLook(allowInput) {
@@ -218,9 +253,11 @@ export class PlayerController {
     this.player.velocity.x = this.wishDir.x;
     this.player.velocity.z = this.wishDir.z;
 
-    if (this.player.onGround && jumpHeld) {
+    this.jumpCooldown = Math.max(0, this.jumpCooldown - delta);
+    if (this.player.onGround && jumpHeld && this.jumpCooldown <= 0) {
       this.player.velocity.y = PLAYER_JUMP_SPEED;
       this.player.onGround = false;
+      this.jumpCooldown = 0.28;
     }
 
     this.player.velocity.y -= PLAYER_GRAVITY * delta;
